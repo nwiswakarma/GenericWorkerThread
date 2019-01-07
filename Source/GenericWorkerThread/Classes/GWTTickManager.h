@@ -23,30 +23,34 @@
 // THE SOFTWARE.
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
+// 
 
-using UnrealBuildTool;
-using System.IO;
+#pragma once
 
-public class GenericWorkerThread: ModuleRules
+#include "CoreMinimal.h"
+
+class GENERICWORKERTHREAD_API FGWTTickManager
 {
-    public GenericWorkerThread(ReadOnlyTargetRules Target) : base(Target)
-	{
-        PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+public:
 
-        // Private include path
-        PrivateIncludePaths.AddRange(new string[] {
-            "GenericWorkerThread/Private"
-        });
+    typedef TFunction<void()> FTickCallback;
 
-        // Base dependencies
-		PublicDependencyModuleNames.AddRange( new string[] {
-            "Core",
-            "CoreUObject",
-            "Engine"
-        } );
+private:
 
-        // Additional dependencies
-		PrivateDependencyModuleNames.AddRange( new string[] { } );
-	}
-}
+	FTickerDelegate TickDelegate;
+	FDelegateHandle TickDelegateHandle;
+
+protected:
+
+    TQueue<FTickCallback, EQueueMode::Mpsc> CallbackQueue;
+
+	virtual bool Tick(float DeltaTime);
+
+public:
+
+    FGWTTickManager();
+    virtual ~FGWTTickManager();
+
+    void ExecuteCallbacks();
+    void EnqueueTickCallback(FTickCallback& TickCallback);
+};

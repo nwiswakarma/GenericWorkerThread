@@ -23,30 +23,49 @@
 // THE SOFTWARE.
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
+// 
 
-using UnrealBuildTool;
-using System.IO;
+#include "GWTTickManager.h"
+#include "GWTAsyncTypes.h"
 
-public class GenericWorkerThread: ModuleRules
+FGWTTickManager::FGWTTickManager()
 {
-    public GenericWorkerThread(ReadOnlyTargetRules Target) : base(Target)
-	{
-        PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+    // Register tick delegate
+    TickDelegate = FTickerDelegate::CreateRaw(this, &FGWTTickManager::Tick);
+    TickDelegateHandle = FTicker::GetCoreTicker().AddTicker(TickDelegate);
+}
 
-        // Private include path
-        PrivateIncludePaths.AddRange(new string[] {
-            "GenericWorkerThread/Private"
-        });
+FGWTTickManager::~FGWTTickManager()
+{
+    // Unregister tick delegate
+    if (TickDelegateHandle.IsValid())
+    {
+        FTicker::GetCoreTicker().RemoveTicker(TickDelegateHandle);
+    }
+}
 
-        // Base dependencies
-		PublicDependencyModuleNames.AddRange( new string[] {
-            "Core",
-            "CoreUObject",
-            "Engine"
-        } );
+bool FGWTTickManager::Tick(float DeltaTime)
+{
+    ExecuteCallbacks();
 
-        // Additional dependencies
-		PrivateDependencyModuleNames.AddRange( new string[] { } );
-	}
+    return true;
+}
+
+void FGWTTickManager::ExecuteCallbacks()
+{
+    while (! CallbackQueue.IsEmpty())
+    {
+        FTickCallback Callback;
+        CallbackQueue.Dequeue(Callback);
+
+        if (Callback)
+        {
+            Callback();
+        }
+    }
+}
+
+void FGWTTickManager::EnqueueTickCallback(FTickCallback& TickCallback)
+{
+    CallbackQueue.Enqueue(TickCallback);
 }

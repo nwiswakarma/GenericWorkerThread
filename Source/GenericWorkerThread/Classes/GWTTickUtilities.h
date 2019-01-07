@@ -23,30 +23,54 @@
 // THE SOFTWARE.
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
+// 
 
-using UnrealBuildTool;
-using System.IO;
+#pragma once
 
-public class GenericWorkerThread: ModuleRules
+#include "CoreMinimal.h"
+#include "CoreDelegates.h"
+#include "Kismet/BlueprintFunctionLibrary.h"
+#include "GWTTickUtilities.generated.h"
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FGWTTickEvent_OnEventCallback);
+
+UCLASS()
+class GENERICWORKERTHREAD_API UGWTTickUtilityLibrary : public UBlueprintFunctionLibrary
 {
-    public GenericWorkerThread(ReadOnlyTargetRules Target) : base(Target)
-	{
-        PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+	GENERATED_BODY()
 
-        // Private include path
-        PrivateIncludePaths.AddRange(new string[] {
-            "GenericWorkerThread/Private"
-        });
+public:
 
-        // Base dependencies
-		PublicDependencyModuleNames.AddRange( new string[] {
-            "Core",
-            "CoreUObject",
-            "Engine"
-        } );
+    UFUNCTION(BlueprintCallable, meta=(WorldContext="WorldContextObject"))
+    static UGWTTickEvent* CreateTickEvent(UObject* WorldContextObject);
+};
 
-        // Additional dependencies
-		PrivateDependencyModuleNames.AddRange( new string[] { } );
-	}
-}
+UCLASS(BlueprintType)
+class GENERICWORKERTHREAD_API UGWTTickEvent : public UObject
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintAssignable)
+    FGWTTickEvent_OnEventCallback OnEventCallback;
+
+    FORCEINLINE void BroadcastEvent()
+    {
+        OnEventCallback.Broadcast();
+    }
+};
+
+struct GENERICWORKERTHREAD_API FGWTTickEventRef
+{
+    UGWTTickEvent* TickEvent = nullptr;
+
+    FGWTTickEventRef() = default;
+
+    FGWTTickEventRef(UGWTTickEvent* InTickEvent)
+        : TickEvent(InTickEvent)
+    {
+    }
+
+    void EnqueueCallback();
+};

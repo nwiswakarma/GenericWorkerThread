@@ -1,3 +1,28 @@
+////////////////////////////////////////////////////////////////////////////////
+//
+// MIT License
+// 
+// Copyright (c) 2018-2019 Nuraga Wiswakarma
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+//
+////////////////////////////////////////////////////////////////////////////////
 // 
 
 #pragma once
@@ -9,8 +34,8 @@
 #include "Containers/List.h"
 #include "GWTTaskWorker.h"
 
-typedef TSharedPtr<class FGWTAsyncThread> TPSGWTAsyncThread;
-typedef TWeakPtr<class FGWTAsyncThread>   TPWGWTAsyncThread;
+typedef TSharedPtr<class FGWTAsyncThread> FPSGWTAsyncThread;
+typedef TWeakPtr<class FGWTAsyncThread>   FPWGWTAsyncThread;
 
 class FGWTAsyncThread
 {
@@ -21,11 +46,8 @@ public:
 
 	FGWTAsyncThread(float InRestTime)
         : RestTime(InRestTime)
-        , PauseEvent(nullptr)
         , bIsThreadStopped(false)
-        , bIsThreadPaused(false)
     {
-        check(RestTime > 0.0001f);
     }
 
 	~FGWTAsyncThread()
@@ -51,15 +73,9 @@ public:
         }
 
         bIsThreadStopped = false;
-        SetPause(false);
 
         FAsyncCallback AsyncExec( [&, this]() {
-            PauseEvent = FGenericPlatformProcess::GetSynchEventFromPool(false);
-
             Run();
-
-            FGenericPlatformProcess::ReturnSynchEventToPool(PauseEvent);
-            PauseEvent = nullptr;
         } );
 
         ThreadFuture = Async<void>(
@@ -79,7 +95,6 @@ public:
         check(! IsThreadStopped());
 
         bIsThreadStopped = true;
-        SetPause(false);
 
         ThreadFuture.Get();
         ThreadFuture = TFuture<void>();
@@ -88,7 +103,7 @@ public:
         ProcessWorkerEntries();
 
         // Registers remaining workers for removal
-        for (TPWGWTTaskWorker& t : WorkerList)
+        for (FPWGWTTaskWorker& t : WorkerList)
         {
             RemoveWorkerAsync(t);
         }
@@ -97,22 +112,8 @@ public:
         ProcessWorkerEntries();
     }
 
-    void SetPause(bool state)
-    {
-        if (bIsThreadPaused != state)
-        {
-            bIsThreadPaused = state;
-
-            if (! bIsThreadPaused && PauseEvent)
-            {
-                PauseEvent->Trigger();
-            }
-        }
-    }
-
 	void SetRestTime(float InRestTime)
 	{
-        check(InRestTime > 0.0001f);
         RestTime = InRestTime;
 	}
 
@@ -131,96 +132,84 @@ public:
 		return bIsThreadStopped;
 	}
 
-	FORCEINLINE bool IsThreadPaused() const
-	{
-		return bIsThreadPaused;
-	}
-
 	// === END Thread Control
 
-	void AddWorker(TPWGWTTaskWorker w)
+	void AddWorker(FPWGWTTaskWorker w)
 	{
-        if (! IsThreadStarted() || ! IsThreadStopped())
-        {
-            WorkerEntries.Enqueue(w);
-        }
+        WorkerEntries.Enqueue(w);
 	}
 
-	FORCEINLINE TFuture<void> RemoveWorker(TPWGWTTaskWorker Worker)
+	FORCEINLINE TFuture<void> RemoveWorker(FPWGWTTaskWorker Worker)
 	{
         WorkerRemovals.Enqueue(Worker);
-        TPSRemovalPromise RemovalPromise( MakeShareable(new TPromise<void>()) );
+        FPSRemovalPromise RemovalPromise( MakeShareable(new TPromise<void>()) );
         WorkerRemovalPromises.Enqueue(RemovalPromise);
         return RemovalPromise->GetFuture();
 	}
 
-	FORCEINLINE void RemoveWorkerAsync(TPWGWTTaskWorker Worker)
+	FORCEINLINE void RemoveWorkerAsync(FPWGWTTaskWorker Worker)
 	{
         WorkerRemovals.Enqueue(Worker);
 	}
 
 private:
 
-    typedef TDoubleLinkedList<TPWGWTTaskWorker>       TGWTTaskWorkerList;
-    typedef TGWTTaskWorkerList::TDoubleLinkedListNode TGWTTaskWorkerListNode;
-    typedef TSharedPtr<TPromise<void>, ESPMode::ThreadSafe> TPSRemovalPromise;
+    typedef TDoubleLinkedList<FPWGWTTaskWorker>       FGWTTaskWorkerList;
+    typedef FGWTTaskWorkerList::TDoubleLinkedListNode FGWTTaskWorkerListNode;
+    typedef TSharedPtr<TPromise<void>> FPSRemovalPromise;
 
     TFuture<void> ThreadFuture;
-	FEvent* PauseEvent = nullptr;
-
-	FThreadSafeBool bIsThreadStopped = false;
-	FThreadSafeBool bIsThreadPaused = false;
+	FThreadSafeBool bIsThreadStopped;
 	float RestTime;
 
-    TGWTTaskWorkerList WorkerList;
-	TQueue<TPWGWTTaskWorker> WorkerEntries;
-	TQueue<TPWGWTTaskWorker> WorkerRemovals;
-    TQueue<TPSRemovalPromise> WorkerRemovalPromises;
+    FGWTTaskWorkerList WorkerList;
+	TQueue<FPWGWTTaskWorker, EQueueMode::Mpsc> WorkerEntries;
+	TQueue<FPWGWTTaskWorker, EQueueMode::Mpsc> WorkerRemovals;
+    TQueue<FPSRemovalPromise, EQueueMode::Mpsc> WorkerRemovalPromises;
 
     int32 _UniqueWorkerId = 0;
 
 	void Run()
     {
-        double currentTime = FPlatformTime::Seconds();
+        double LastUpdateTime = FPlatformTime::Seconds();
+
+        // Initial sleep
         FPlatformProcess::Sleep(0.03);
 
         while (! IsThreadStopped())
         {
-            double deltaTime = FPlatformTime::Seconds() - currentTime;
-
-            if (IsThreadPaused())
-            {
-                PauseEvent->Wait();
-                continue;
-            }
-
             ProcessWorkerEntries();
 
             if (WorkerList.Num() > 0)
             {
-                TGWTTaskWorkerListNode* Node0( nullptr );
-                TGWTTaskWorkerListNode* Node1( WorkerList.GetHead() );
+                FGWTTaskWorkerListNode* Node0( nullptr );
+                FGWTTaskWorkerListNode* Node1( WorkerList.GetHead() );
                 do
                 {
                     Node0 = Node1;
                     Node1 = Node0->GetNextNode();
 
-                    TPSGWTTaskWorker Worker( Node0->GetValue().Pin() );
+                    FPSGWTTaskWorker Worker( Node0->GetValue().Pin() );
 
                     if (Worker.IsValid())
                     {
-                        Worker->Tick(deltaTime);
+                        double DeltaTime = FPlatformTime::Seconds() - LastUpdateTime;
+                        Worker->Tick(DeltaTime);
                     }
                     else
                     {
                         WorkerList.RemoveNode(Node0);
                     }
                 }
-                while ( Node1 );
+                while (Node1);
             }
 
-            currentTime = FPlatformTime::Seconds();
-            FPlatformProcess::Sleep(RestTime);
+            LastUpdateTime = FPlatformTime::Seconds();
+
+            if (RestTime > 0.f)
+            {
+                FPlatformProcess::Sleep(RestTime);
+            }
         }
 	}
 
@@ -233,21 +222,21 @@ private:
 
         while (! WorkerEntries.IsEmpty())
         {
-            TPWGWTTaskWorker pWorker;
+            FPWGWTTaskWorker pWorker;
             WorkerEntries.Dequeue(pWorker);
 
             if (pWorker.IsValid() && ! WorkerList.Contains(pWorker))
             {
-                TPSGWTTaskWorker Worker( pWorker.Pin() );
+                FPSGWTTaskWorker Worker( pWorker.Pin() );
                 WorkerList.AddTail(Worker);
-                Worker->_WorkerId = _UniqueWorkerId++;
-                Worker->Setup();
+                Worker->_TaskWorkerId = _UniqueWorkerId++;
+                Worker->SetupTaskWorker();
             }
         }
 
         while (! WorkerRemovals.IsEmpty())
         {
-            TPWGWTTaskWorker pWorker;
+            FPWGWTTaskWorker pWorker;
             WorkerRemovals.Dequeue(pWorker);
 
             if (WorkerList.Contains(pWorker))
@@ -256,16 +245,16 @@ private:
 
                 if (pWorker.IsValid())
                 {
-                    TPSGWTTaskWorker Worker( pWorker.Pin() );
-                    Worker->Shutdown();
-                    Worker->_WorkerId = -1;
+                    FPSGWTTaskWorker Worker( pWorker.Pin() );
+                    Worker->ShutdownTaskWorker();
+                    Worker->_TaskWorkerId = -1;
                 }
             }
         }
 
         while (! WorkerRemovalPromises.IsEmpty())
         {
-            TPSRemovalPromise RemovalPromise;
+            FPSRemovalPromise RemovalPromise;
             WorkerRemovalPromises.Dequeue(RemovalPromise);
             RemovalPromise->SetValue();
         }

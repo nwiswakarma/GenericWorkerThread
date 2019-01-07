@@ -23,30 +23,27 @@
 // THE SOFTWARE.
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
+// 
 
-using UnrealBuildTool;
-using System.IO;
+#include "GWTTickUtilities.h"
+#include "GWTTickManager.h"
 
-public class GenericWorkerThread: ModuleRules
+UGWTTickEvent* UGWTTickUtilityLibrary::CreateTickEvent(UObject* WorldContextObject)
 {
-    public GenericWorkerThread(ReadOnlyTargetRules Target) : base(Target)
-	{
-        PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+    return NewObject<UGWTTickEvent>(WorldContextObject);
+}
 
-        // Private include path
-        PrivateIncludePaths.AddRange(new string[] {
-            "GenericWorkerThread/Private"
-        });
-
-        // Base dependencies
-		PublicDependencyModuleNames.AddRange( new string[] {
-            "Core",
-            "CoreUObject",
-            "Engine"
+void FGWTTickEventRef::EnqueueCallback()
+{
+    UGWTTickEvent* TickEventPtr = TickEvent;
+    FGWTTickManager& TickManager(IGenericWorkerThread::Get().GetTickManager());
+    FGWTTickManager::FTickCallback TickCallback(
+        [TickEventPtr]()
+        {
+            if (IsValid(TickEventPtr))
+            {
+                TickEventPtr->BroadcastEvent();
+            }
         } );
-
-        // Additional dependencies
-		PrivateDependencyModuleNames.AddRange( new string[] { } );
-	}
+    TickManager.EnqueueTickCallback(TickCallback);
 }

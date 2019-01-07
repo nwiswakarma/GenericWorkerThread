@@ -1,17 +1,41 @@
-/*
-	
-*/
+////////////////////////////////////////////////////////////////////////////////
+//
+// MIT License
+// 
+// Copyright (c) 2018-2019 Nuraga Wiswakarma
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+//
+////////////////////////////////////////////////////////////////////////////////
+// 
 
 #include "GenericWorkerThread.h"
-#include "GWTAsyncThread.h"
+#include "GWTAsyncThreadManager.h"
 #include "GWTTaskWorker.h"
+#include "GWTTickManager.h"
 
 #define LOCTEXT_NAMESPACE "FGenericWorkerThread"
 
 class FGenericWorkerThread : public IGenericWorkerThread
 {
-    int32 UniqueThreadID = 0;
-    TMap<int32, TPSGWTAsyncThread> ThreadInstanceMap;
+    FGWTAsyncThreadManager AsyncThreadManager;
+    FGWTTickManager        TickManager;
 
 public:
 
@@ -27,66 +51,24 @@ public:
 
     // -- END IModuleInterface
 
-    virtual int32 CreateInstance(float InRestTime)
+    virtual FGWTAsyncThreadManager& GetAsyncThreadManager()
     {
-        int32 ThreadId = UniqueThreadID++;
-        TPSGWTAsyncThread AsyncThread( new FGWTAsyncThread(InRestTime) );
-        ThreadInstanceMap.Add(ThreadId, AsyncThread);
-        return ThreadId;
+        return AsyncThreadManager;
     }
 
-    FORCEINLINE virtual TPWGWTAsyncThread GetThread(int32 ThreadId)
+    virtual const FGWTAsyncThreadManager& GetAsyncThreadManager() const
     {
-        return ThreadInstanceMap.Contains(ThreadId)
-            ? ThreadInstanceMap.FindChecked(ThreadId)
-            : TPWGWTAsyncThread();
+        return AsyncThreadManager;
     }
 
-    virtual void AddWorker(int32 ThreadId, TPWGWTTaskWorker TaskWorker)
+    virtual FGWTTickManager& GetTickManager()
     {
-        TPSGWTAsyncThread AsyncThread( GetThread(ThreadId).Pin() );
-        if (AsyncThread.IsValid())
-        {
-            AsyncThread->AddWorker(TaskWorker);
-        }
+        return TickManager;
     }
 
-    virtual TFuture<void> RemoveWorker(int32 ThreadId, TPWGWTTaskWorker TaskWorker)
+    virtual const FGWTTickManager& GetTickManager() const
     {
-        TPSGWTAsyncThread AsyncThread( GetThread(ThreadId).Pin() );
-        if (AsyncThread.IsValid())
-        {
-            return AsyncThread->RemoveWorker(TaskWorker);
-        }
-        return TFuture<void>();
-    }
-
-    virtual void RemoveWorkerAsync(int32 ThreadId, TPWGWTTaskWorker TaskWorker)
-    {
-        TPSGWTAsyncThread AsyncThread( GetThread(ThreadId).Pin() );
-        if (AsyncThread.IsValid())
-        {
-            AsyncThread->RemoveWorkerAsync(TaskWorker);
-        }
-    }
-
-    virtual void SetRestTime(int32 ThreadId, float InRestTime)
-    {
-        TPSGWTAsyncThread AsyncThread( GetThread(ThreadId).Pin() );
-        if (AsyncThread.IsValid())
-        {
-            AsyncThread->SetRestTime(InRestTime);
-        }
-    }
-
-    FORCEINLINE virtual float GetRestTime(int32 ThreadId)
-    {
-        TPSGWTAsyncThread AsyncThread( GetThread(ThreadId).Pin() );
-        if (AsyncThread.IsValid())
-        {
-            return AsyncThread->GetRestTime();
-        }
-        return -1.f;
+        return TickManager;
     }
 };
 
