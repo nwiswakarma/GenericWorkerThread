@@ -162,8 +162,8 @@ struct GENERICWORKERTHREAD_API FGWTAsyncTask
     FGWTAsyncTask() = default;
 
     FGWTAsyncTask(const FPSGWTEventFuture& InFuture, FGWTAsyncThreadPool& InThreadPool)
-        : Future(InFuture)
-        , ThreadPool(&InThreadPool)
+        : ThreadPool(&InThreadPool)
+        , Future(InFuture)
     {
     }
 
@@ -254,8 +254,8 @@ struct GENERICWORKERTHREAD_API FGWTAsyncTaskRef
     }
 
     FGWTAsyncTaskRef(const FPSGWTEventFuture& InFuture, const FPRGWTAsyncThreadPool& InThreadPool)
-        : Task(new FGWTAsyncTask(InFuture, *InThreadPool))
-        , ThreadPool(InThreadPool)
+        : ThreadPool(InThreadPool)
+        , Task(new FGWTAsyncTask(InFuture, *InThreadPool))
     {
     }
 

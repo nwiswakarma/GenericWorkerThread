@@ -45,8 +45,8 @@ public:
     typedef TFunction<void()> FAsyncCallback;
 
 	FGWTAsyncThread(float InRestTime)
-        : RestTime(InRestTime)
-        , bIsThreadStopped(false)
+        : bIsThreadStopped(false)
+        , RestTime(InRestTime)
     {
     }
 
