@@ -35,7 +35,7 @@ UGWTTickEvent* UGWTTickUtilityLibrary::CreateTickEvent(UObject* WorldContextObje
 
 void FGWTTickEventRef::EnqueueCallback()
 {
-    UGWTTickEvent* TickEventPtr = TickEvent;
+    UGWTTickEvent* TickEventPtr(TickEvent);
     FGWTTickManager& TickManager(IGenericWorkerThread::Get().GetTickManager());
     FGWTTickManager::FTickCallback TickCallback(
         [TickEventPtr]()
