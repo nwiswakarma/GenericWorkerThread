@@ -33,17 +33,14 @@ UGWTTickEvent* UGWTTickUtilityLibrary::CreateTickEvent(UObject* WorldContextObje
     return NewObject<UGWTTickEvent>(WorldContextObject);
 }
 
+void UGWTTickEvent::EnqueueCallback()
+{
+    FGWTTickManager& TickManager(IGenericWorkerThread::Get().GetTickManager());
+    TickManager.EnqueueTickEvent(this);
+}
+
 void FGWTTickEventRef::EnqueueCallback()
 {
-    UGWTTickEvent* TickEventPtr(TickEvent);
     FGWTTickManager& TickManager(IGenericWorkerThread::Get().GetTickManager());
-    FGWTTickManager::FTickCallback TickCallback(
-        [TickEventPtr]()
-        {
-            if (IsValid(TickEventPtr))
-            {
-                TickEventPtr->BroadcastEvent();
-            }
-        } );
-    TickManager.EnqueueTickCallback(TickCallback);
+    TickManager.EnqueueTickEvent(TickEvent);
 }

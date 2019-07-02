@@ -29,6 +29,8 @@
 
 #include "CoreMinimal.h"
 
+class UGWTTickEvent;
+
 class GENERICWORKERTHREAD_API FGWTTickManager
 {
 public:
@@ -52,5 +54,6 @@ public:
     virtual ~FGWTTickManager();
 
     void ExecuteCallbacks();
-    void EnqueueTickCallback(FTickCallback& TickCallback);
+    void EnqueueTickCallback(const FTickCallback& TickCallback);
+    void EnqueueTickEvent(UGWTTickEvent* TickEvent);
 };

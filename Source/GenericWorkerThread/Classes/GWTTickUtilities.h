@@ -59,6 +59,9 @@ public:
     {
         OnEventCallback.Broadcast();
     }
+
+	UFUNCTION(BlueprintCallable)
+    void EnqueueCallback();
 };
 
 struct GENERICWORKERTHREAD_API FGWTTickEventRef

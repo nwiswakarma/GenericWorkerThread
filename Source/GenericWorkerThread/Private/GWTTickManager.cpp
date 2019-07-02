@@ -27,6 +27,7 @@
 
 #include "GWTTickManager.h"
 #include "GWTAsyncTypes.h"
+#include "GWTTickUtilities.h"
 
 FGWTTickManager::FGWTTickManager()
 {
@@ -65,7 +66,20 @@ void FGWTTickManager::ExecuteCallbacks()
     }
 }
 
-void FGWTTickManager::EnqueueTickCallback(FTickCallback& TickCallback)
+void FGWTTickManager::EnqueueTickCallback(const FTickCallback& TickCallback)
 {
     CallbackQueue.Enqueue(TickCallback);
+}
+
+void FGWTTickManager::EnqueueTickEvent(UGWTTickEvent* TickEvent)
+{
+    FTickCallback TickCallback(
+        [TickEvent]()
+        {
+            if (IsValid(TickEvent))
+            {
+                TickEvent->BroadcastEvent();
+            }
+        } );
+    EnqueueTickCallback(TickCallback);
 }
